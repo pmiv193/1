@@ -1,4 +1,4 @@
-name: WINDOWS_11_AUDIO_VBCABLE_V45
+name: WINDOWS_11_RUSTDESK_CATBOX
 on: 
   workflow_dispatch:
 
@@ -7,29 +7,16 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 🛠️ 1. INSTALAR VB-CABLE V45
+      - name: 🔑 INSTALAR Y CONFIGURAR RUSTDESK
         shell: powershell
         run: |
-          Write-Host "[*] Descargando VB-CABLE Pack 45..." -ForegroundColor Cyan
-          $url = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
-          # Usamos -UserAgent para evitar que el servidor de VB-Audio bloquee la descarga
-          Invoke-WebRequest -Uri $url -OutFile "vbcable.zip" -UserAgent "Mozilla/5.0"
-          
-          Write-Host "[*] Descomprimiendo archivos..." -ForegroundColor Yellow
-          Expand-Archive -Path "vbcable.zip" -DestinationPath ".\vbcable" -Force
-          
-          Write-Host "[*] Instalando Driver de 64 bits (Silencioso)..." -ForegroundColor Cyan
-          # /i = install, /s = silent
-          Start-Process ".\vbcable\VBCABLE_Setup_x64.exe" -ArgumentList "/i /s" -Wait
-          
-          Write-Host "[+] Instalacion completada. Reiniciando servicios de audio..." -ForegroundColor Green
-          net stop Audiosrv; net start Audiosrv
-
-      - name: 🔑 2. CONFIGURAR RUSTDESK
-        shell: powershell
-        run: |
+          Write-Host "[*] Descargando RustDesk..." -ForegroundColor Cyan
           curl.exe -L -o rd.msi "https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.msi"
+          
+          Write-Host "[*] Instalando..." -ForegroundColor Yellow
           Start-Process msiexec.exe -ArgumentList "/i rd.msi /quiet /norestart" -Wait
+          
+          Write-Host "[*] Configurando acceso..." -ForegroundColor Cyan
           Start-Sleep -Seconds 15
           & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
@@ -37,18 +24,44 @@ jobs:
           for ($i=0; $i -lt 12; $i++) {
               $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
               if ($id) { break }
-              Write-Host "[!] Obteniendo ID..."
+              Write-Host "[!] Esperando ID..."
               Start-Sleep -Seconds 5
           }
           
           Write-Host "################################################" -ForegroundColor Yellow
-          Write-Host "TU ID: $id" -ForegroundColor Green
-          Write-Host "CLAVE: Bullet123" -ForegroundColor Green
+          Write-Host "TU ID DE CONEXION: $id" -ForegroundColor Green
+          Write-Host "CONTRASEÑA: Bullet123" -ForegroundColor Green
           Write-Host "################################################" -ForegroundColor Yellow
+
+      - name: 📸 CAPTURA Y ENVIO A CATBOX
+        shell: powershell
+        run: |
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          
+          # Abrir la interfaz de RustDesk para que salga en la foto
+          Start-Process "C:\Program Files\RustDesk\rustdesk.exe"
+          Start-Sleep -Seconds 5
+          
+          # Tomar captura de pantalla
+          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
+          $bitmap = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
+          $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+          $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
+          $bitmap.Save("C:\Users\Public\id_screenshot.png")
+          $graphics.Dispose()
+          $bitmap.Dispose()
+          
+          Write-Host "[*] Enviando captura a Catbox..." -ForegroundColor Cyan
+          # Subir a Catbox usando la API
+          $response = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\id_screenshot.png" https://catbox.moe/user/api.php
+          
+          Write-Host "################################################" -ForegroundColor Green
+          Write-Host "LINK DE LA CAPTURA (CATBOX): $response" -ForegroundColor White
+          Write-Host "################################################" -ForegroundColor Green
 
       - name: 🔄 MANTENER VIVO
         shell: powershell
         run: |
-          Write-Host "[!] El servidor de audio y RustDesk estan activos." -ForegroundColor Cyan
           while($true) { Start-Sleep -Seconds 60 }
           
