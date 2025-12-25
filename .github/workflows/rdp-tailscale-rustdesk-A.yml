@@ -1,4 +1,4 @@
-name: WINDOWS_11_RUSTDESK_AUDIO_PRO
+name: WINDOWS_11_AUDIO_VBCABLE_V45
 on: 
   workflow_dispatch:
 
@@ -7,15 +7,23 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 🛠️ 1. INSTALAR DRIVERS DE AUDIO VIRTUAL (VB-CABLE)
+      - name: 🛠️ 1. INSTALAR VB-CABLE V45
         shell: powershell
         run: |
-          Write-Host "[*] Descargando Drivers de Audio..." -ForegroundColor Cyan
-          curl.exe -L -o vbcable.zip "https://download.vb-audio.com/Download_Html/VBCABLE_Driver_Pack43.zip"
-          Expand-Archive vbcable.zip -DestinationPath .\vbcable
-          # Instalar el driver de forma silenciosa (64 bits)
+          Write-Host "[*] Descargando VB-CABLE Pack 45..." -ForegroundColor Cyan
+          $url = "https://download.vb-audio.com/Download_CABLE/VBCABLE_Driver_Pack45.zip"
+          # Usamos -UserAgent para evitar que el servidor de VB-Audio bloquee la descarga
+          Invoke-WebRequest -Uri $url -OutFile "vbcable.zip" -UserAgent "Mozilla/5.0"
+          
+          Write-Host "[*] Descomprimiendo archivos..." -ForegroundColor Yellow
+          Expand-Archive -Path "vbcable.zip" -DestinationPath ".\vbcable" -Force
+          
+          Write-Host "[*] Instalando Driver de 64 bits (Silencioso)..." -ForegroundColor Cyan
+          # /i = install, /s = silent
           Start-Process ".\vbcable\VBCABLE_Setup_x64.exe" -ArgumentList "/i /s" -Wait
-          Write-Host "[+] Drivers de Audio instalados correctamente." -ForegroundColor Green
+          
+          Write-Host "[+] Instalacion completada. Reiniciando servicios de audio..." -ForegroundColor Green
+          net stop Audiosrv; net start Audiosrv
 
       - name: 🔑 2. CONFIGURAR RUSTDESK
         shell: powershell
@@ -26,9 +34,10 @@ jobs:
           & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
           $id = ""
-          for ($i=0; $i -lt 10; $i++) {
+          for ($i=0; $i -lt 12; $i++) {
               $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
               if ($id) { break }
+              Write-Host "[!] Obteniendo ID..."
               Start-Sleep -Seconds 5
           }
           
@@ -37,16 +46,9 @@ jobs:
           Write-Host "CLAVE: Bullet123" -ForegroundColor Green
           Write-Host "################################################" -ForegroundColor Yellow
 
-      - name: 🎧 3. AJUSTES FINALES Y DISCORD READY
-        shell: powershell
-        run: |
-          # Reiniciar el servicio de audio de Windows para que detecte el nuevo hardware
-          net stop Audiosrv
-          net start Audiosrv
-          Write-Host "[*] Sistema de audio reiniciado. Discord detectara 'CABLE Output'." -ForegroundColor Cyan
-
       - name: 🔄 MANTENER VIVO
         shell: powershell
         run: |
+          Write-Host "[!] El servidor de audio y RustDesk estan activos." -ForegroundColor Cyan
           while($true) { Start-Sleep -Seconds 60 }
           
