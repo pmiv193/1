@@ -1,4 +1,4 @@
-name: WINDOWS_10_ULTIMATE_VNC
+name: WINDOWS_10_VNC_CELULAR_FIXED
 on: 
   workflow_dispatch:
 
@@ -23,8 +23,7 @@ jobs:
           & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 win10_clean.qcow2 100G
           
           # Lanzamos la VM con VNC en el puerto 5900
-          # -display none: Oculta el Windows 11 host
-          # -vnc :0: Abre la puerta para tu conexion directa
+          # -display none: Oculta el Windows 11 host para que no moleste
           Start-Process "C:\Program Files\qemu\qemu-system-x86_64.exe" -ArgumentList `
             "-m 10G", `
             "-smp 4,cores=4", `
@@ -41,25 +40,43 @@ jobs:
       - name: 🌐 3. CONECTAR TÚNEL Y MOSTRAR IP
         shell: powershell
         run: |
-          # Tu Token de Ngrok ya configurado
+          # Tu Token de Ngrok
           $NGROK_TOKEN = "377nhcufrMXbsEoPizYP8xnS22I_WaaTwHifh1DN6doMG5jU"
           
           Write-Host "[*] Configurando Ngrok..." -ForegroundColor Yellow
           & ngrok config add-authtoken $NGROK_TOKEN
           
-          # Creamos el tunel TCP al puerto 5900 (VNC)
+          # Iniciamos el tunel TCP
+          Write-Host "[*] Abriendo tunel TCP 5900..." -ForegroundColor Cyan
           Start-Process ngrok -ArgumentList "tcp 5900"
           
-          Start-Sleep -Seconds 15
+          # BUCLE DE ESPERA INTELIGENTE (Para evitar el error de Null Array)
+          $ngrok_url = ""
+          Write-Host "[*] Esperando a que Ngrok genere la IP..." -ForegroundColor Yellow
           
-          # Extraemos la IP publica para que te conectes
-          $ngrok_url = (curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json).tunnels[0].public_url
+          for ($i=0; $i -lt 15; $i++) {
+              Start-Sleep -Seconds 7
+              try {
+                  $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
+                  $ngrok_url = $response.tunnels[0].public_url
+                  if ($ngrok_url -ne $null -and $ngrok_url -ne "") { break }
+              } catch {
+                  Write-Host "[!] Reintentando conexion con la API de Ngrok..."
+              }
+          }
           
+          if ($null -eq $ngrok_url -or $ngrok_url -eq "") {
+              Write-Host "[-] ERROR CRITICO: No se pudo obtener la IP de Ngrok." -ForegroundColor Red
+              exit 1
+          }
+
           Write-Host "################################################" -ForegroundColor Green
-          Write-Host "CONECTATE A TU WINDOWS 10 USANDO ESTA DIRECCION:" -ForegroundColor Cyan
-          Write-Host "IP: $ngrok_url" -ForegroundColor White
+          Write-Host "¡TODO LISTO! CONÉCTATE DESDE TU CELULAR" -ForegroundColor White
+          Write-Host "DIRECCION IP: $ngrok_url" -ForegroundColor Cyan
           Write-Host "################################################" -ForegroundColor Green
-          Write-Host "Instrucciones: Abre TightVNC o VNC Viewer y pega esa IP."
+          Write-Host "1. Abre VNC Viewer en tu celular."
+          Write-Host "2. Crea una conexion con esa IP."
+          Write-Host "3. ¡Disfruta de tu Windows 10 limpio!"
           
           # Mantenemos vivo por 6 horas
           while($true) { Start-Sleep -Seconds 60 }
