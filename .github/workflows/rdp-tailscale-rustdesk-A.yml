@@ -1,4 +1,4 @@
-name: WINDOWS_10_VNC_CELULAR_FIXED
+name: WINDOWS_10_VNC_FINAL_FIX
 on: 
   workflow_dispatch:
 
@@ -10,20 +10,14 @@ jobs:
       - name: 📥 1. INSTALAR MOTOR Y ISO
         shell: powershell
         run: |
-          # Instalamos QEMU y Ngrok
           choco install qemu ngrok -y
-          
-          Write-Host "[*] Descargando Tiny10 x64 (Windows 10 Limpio)..." -ForegroundColor Cyan
+          Write-Host "[*] Descargando Windows 10 Limpio..." -ForegroundColor Cyan
           curl.exe -L -o win10.iso "https://archive.org/download/tiny-10-NTDEV/tiny10%2023h1%20x64.iso"
 
-      - name: 🚀 2. LANZAR WINDOWS 10
+      - name: 🚀 2. LANZAR VM
         shell: powershell
         run: |
-          # Creamos el disco de 100GB
           & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 win10_clean.qcow2 100G
-          
-          # Lanzamos la VM con VNC en el puerto 5900
-          # -display none: Oculta el Windows 11 host para que no moleste
           Start-Process "C:\Program Files\qemu\qemu-system-x86_64.exe" -ArgumentList `
             "-m 10G", `
             "-smp 4,cores=4", `
@@ -37,47 +31,50 @@ jobs:
             "-net user", `
             "-accel whpx"
 
-      - name: 🌐 3. CONECTAR TÚNEL Y MOSTRAR IP
+      - name: 🌐 3. CONECTAR NGROK
         shell: powershell
         run: |
-          # Tu Token de Ngrok
           $NGROK_TOKEN = "377nhcufrMXbsEoPizYP8xnS22I_WaaTwHifh1DN6doMG5jU"
-          
-          Write-Host "[*] Configurando Ngrok..." -ForegroundColor Yellow
           & ngrok config add-authtoken $NGROK_TOKEN
           
-          # Iniciamos el tunel TCP
-          Write-Host "[*] Abriendo tunel TCP 5900..." -ForegroundColor Cyan
-          Start-Process ngrok -ArgumentList "tcp 5900"
+          Write-Host "[*] Iniciando Ngrok en modo persistente..." -ForegroundColor Yellow
+          # Lanzamos ngrok usando CMD para asegurar que el proceso se mantenga
+          $ngrokProcess = Start-Process cmd -ArgumentList "/c ngrok tcp 5900 --log=stdout" -PassThru -WindowStyle Hidden
           
-          # BUCLE DE ESPERA INTELIGENTE (Para evitar el error de Null Array)
+          Write-Host "[*] Esperando 30 segundos para estabilidad..." -ForegroundColor Cyan
+          Start-Sleep -Seconds 30
+          
           $ngrok_url = ""
-          Write-Host "[*] Esperando a que Ngrok genere la IP..." -ForegroundColor Yellow
-          
-          for ($i=0; $i -lt 15; $i++) {
-              Start-Sleep -Seconds 7
+          $attempts = 0
+          while ($attempts -lt 10) {
               try {
                   $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
                   $ngrok_url = $response.tunnels[0].public_url
-                  if ($ngrok_url -ne $null -and $ngrok_url -ne "") { break }
+                  if ($ngrok_url) { break }
               } catch {
-                  Write-Host "[!] Reintentando conexion con la API de Ngrok..."
+                  Write-Host "[!] Buscando tunel... (Intento $attempts)"
               }
+              $attempts++
+              Start-Sleep -Seconds 10
           }
           
-          if ($null -eq $ngrok_url -or $ngrok_url -eq "") {
-              Write-Host "[-] ERROR CRITICO: No se pudo obtener la IP de Ngrok." -ForegroundColor Red
-              exit 1
+          if (-not $ngrok_url) {
+              Write-Host "[-] Ngrok API no responde. Intentando lectura de logs..." -ForegroundColor Orange
+              # Plan B: Si la API falla, ngrok a veces necesita un empujón
+              & ngrok tcp 5900 --log=stdout &
+              Start-Sleep -Seconds 20
+              $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
+              $ngrok_url = $response.tunnels[0].public_url
           }
 
-          Write-Host "################################################" -ForegroundColor Green
-          Write-Host "¡TODO LISTO! CONÉCTATE DESDE TU CELULAR" -ForegroundColor White
-          Write-Host "DIRECCION IP: $ngrok_url" -ForegroundColor Cyan
-          Write-Host "################################################" -ForegroundColor Green
-          Write-Host "1. Abre VNC Viewer en tu celular."
-          Write-Host "2. Crea una conexion con esa IP."
-          Write-Host "3. ¡Disfruta de tu Windows 10 limpio!"
+          if ($ngrok_url) {
+              Write-Host "################################################" -ForegroundColor Green
+              Write-Host "IP PARA TU CELULAR: $ngrok_url" -ForegroundColor White
+              Write-Host "################################################" -ForegroundColor Green
+          } else {
+              Write-Host "[-] No se pudo obtener la IP. Revisa si el Token es correcto." -ForegroundColor Red
+              exit 1
+          }
           
-          # Mantenemos vivo por 6 horas
           while($true) { Start-Sleep -Seconds 60 }
           
