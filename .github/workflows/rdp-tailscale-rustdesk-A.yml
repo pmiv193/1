@@ -1,17 +1,19 @@
-name: WINDOWS_10_VNC_FINAL_FIX_V2
+name: WINDOWS_10_VNC_LOCALTUNNEL
 on: 
   workflow_dispatch:
 
 jobs:
-  deploy_vm:
+  deploy:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 📥 1. INSTALAR MOTOR Y ISO
+      - name: 📥 1. INSTALAR QEMU Y NODEJS
         shell: powershell
         run: |
-          choco install qemu ngrok -y
-          Write-Host "[*] Descargando Windows 10 Limpio..." -ForegroundColor Cyan
+          choco install qemu -y
+          # Instalamos Localtunnel usando NPM (viene con NodeJS en GitHub)
+          npm install -g localtunnel
+          Write-Host "[*] Descargando Windows 10..." -ForegroundColor Cyan
           curl.exe -L -o win10.iso "https://archive.org/download/tiny-10-NTDEV/tiny10%2023h1%20x64.iso"
 
       - name: 🚀 2. LANZAR VM
@@ -31,43 +33,21 @@ jobs:
             "-net user", `
             "-accel whpx"
 
-      - name: 🌐 3. CONECTAR NGROK
+      - name: 🌐 3. ABRIR TUNEL PUBLICO
         shell: powershell
         run: |
-          $NGROK_TOKEN = "377nhcufrMXbsEoPizYP8xnS22I_WaaTwHifh1DN6doMG5jU"
-          & ngrok config add-authtoken $NGROK_TOKEN
+          Write-Host "[*] Iniciando Tunel..." -ForegroundColor Yellow
+          # Iniciamos localtunnel apuntando al puerto VNC (5900)
+          # Esto te dara una URL tipo: https://XXXXXX.loca.lt
+          Start-Process lt -ArgumentList "--port 5900" -RedirectStandardOutput "link.txt"
           
-          Write-Host "[*] Iniciando Ngrok..." -ForegroundColor Yellow
-          # Usamos Start-Process para que ngrok corra de forma independiente sin bloquear el script
-          Start-Process ngrok -ArgumentList "tcp 5900" -WindowStyle Hidden
+          Start-Sleep -Seconds 15
+          $url = Get-Content "link.txt"
           
-          Write-Host "[*] Esperando a que el tunel se estabilice..." -ForegroundColor Cyan
-          Start-Sleep -Seconds 30
+          Write-Host "################################################" -ForegroundColor Green
+          Write-Host "TU URL PARA VNC ES: $url" -ForegroundColor Cyan
+          Write-Host "################################################" -ForegroundColor Green
+          Write-Host "Si la URL no carga en VNC Viewer, prueba poner la IP de GitHub directamente si la app lo permite."
           
-          $ngrok_url = ""
-          $attempts = 0
-          while ($attempts -lt 15) {
-              try {
-                  $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
-                  $ngrok_url = $response.tunnels[0].public_url
-                  if ($ngrok_url) { break }
-              } catch {
-                  Write-Host "[!] Buscando tunel... (Intento $attempts)"
-              }
-              $attempts++
-              Start-Sleep -Seconds 5
-          }
-          
-          if ($ngrok_url) {
-              Write-Host "################################################" -ForegroundColor Green
-              Write-Host "TODO LISTO. CONECTATE DESDE TU CELULAR" -ForegroundColor White
-              Write-Host "DIRECCION IP: $ngrok_url" -ForegroundColor Cyan
-              Write-Host "################################################" -ForegroundColor Green
-          } else {
-              Write-Host "[-] Error: No se pudo obtener la IP. Revisa los logs de Ngrok." -ForegroundColor Red
-              exit 1
-          }
-          
-          # Mantener el workflow activo para que no se cierre la maquina
           while($true) { Start-Sleep -Seconds 60 }
           
