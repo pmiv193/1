@@ -1,4 +1,4 @@
-name: WINDOWS_10_PURE_CLOUDFLARE
+name: WINDOWS_11_RUSTDESK_AUDIO_PRO
 on: 
   workflow_dispatch:
 
@@ -7,53 +7,46 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 📥 1. INSTALAR QEMU Y CLOUDFLARE
+      - name: 🛠️ 1. INSTALAR DRIVERS DE AUDIO VIRTUAL (VB-CABLE)
         shell: powershell
         run: |
-          choco install qemu cloudflared -y
-          Write-Host "[*] Descargando Windows 10 Limpio..." -ForegroundColor Cyan
-          curl.exe -L -o win10.iso "https://archive.org/download/tiny-10-NTDEV/tiny10%2023h1%20x64.iso"
+          Write-Host "[*] Descargando Drivers de Audio..." -ForegroundColor Cyan
+          curl.exe -L -o vbcable.zip "https://download.vb-audio.com/Download_Html/VBCABLE_Driver_Pack43.zip"
+          Expand-Archive vbcable.zip -DestinationPath .\vbcable
+          # Instalar el driver de forma silenciosa (64 bits)
+          Start-Process ".\vbcable\VBCABLE_Setup_x64.exe" -ArgumentList "/i /s" -Wait
+          Write-Host "[+] Drivers de Audio instalados correctamente." -ForegroundColor Green
 
-      - name: 🚀 2. LANZAR VM
+      - name: 🔑 2. CONFIGURAR RUSTDESK
         shell: powershell
         run: |
-          & "C:\Program Files\qemu\qemu-img.exe" create -f qcow2 win10_clean.qcow2 100G
-          Start-Process "C:\Program Files\qemu\qemu-system-x86_64.exe" -ArgumentList `
-            "-m 10G", `
-            "-smp 4,cores=4", `
-            "-cpu host,kvm=off,hv_vendor_id=null", `
-            "-drive file=win10_clean.qcow2,format=qcow2", `
-            "-cdrom win10.iso", `
-            "-vga virtio", `
-            "-display none", `
-            "-vnc :0", `
-            "-net nic,model=e1000", `
-            "-net user", `
-            "-accel whpx"
-
-      - name: 🌐 3. GENERAR IP PUBLICA
-        shell: powershell
-        run: |
-          Write-Host "[*] Iniciando Tunel de Cloudflare..." -ForegroundColor Yellow
+          curl.exe -L -o rd.msi "https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.msi"
+          Start-Process msiexec.exe -ArgumentList "/i rd.msi /quiet /norestart" -Wait
+          Start-Sleep -Seconds 15
+          & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
-          # Lanzamos el tunel y guardamos el log para extraer la URL
-          Start-Process cmd -ArgumentList "/c cloudflared tunnel --url tcp://localhost:5900 > cf.log 2>&1"
-          
-          Write-Host "[*] Esperando 20 segundos para obtener la direccion..." -ForegroundColor Cyan
-          Start-Sleep -Seconds 20
-          
-          # Buscamos la URL en el archivo de log
-          $cf_url = Get-Content "cf.log" | Select-String -Pattern "https://.*\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
-          
-          if ($cf_url) {
-              Write-Host "################################################" -ForegroundColor Green
-              Write-Host "TU URL DE CONEXION ES: $cf_url" -ForegroundColor White
-              Write-Host "################################################" -ForegroundColor Green
-              Write-Host "Nota: Si usas VNC Viewer, usa el modo TCP con esa URL."
-          } else {
-              Write-Host "[-] No se detecto URL automatica. Mostrando logs para copia manual:" -ForegroundColor Orange
-              Get-Content "cf.log"
+          $id = ""
+          for ($i=0; $i -lt 10; $i++) {
+              $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
+              if ($id) { break }
+              Start-Sleep -Seconds 5
           }
           
+          Write-Host "################################################" -ForegroundColor Yellow
+          Write-Host "TU ID: $id" -ForegroundColor Green
+          Write-Host "CLAVE: Bullet123" -ForegroundColor Green
+          Write-Host "################################################" -ForegroundColor Yellow
+
+      - name: 🎧 3. AJUSTES FINALES Y DISCORD READY
+        shell: powershell
+        run: |
+          # Reiniciar el servicio de audio de Windows para que detecte el nuevo hardware
+          net stop Audiosrv
+          net start Audiosrv
+          Write-Host "[*] Sistema de audio reiniciado. Discord detectara 'CABLE Output'." -ForegroundColor Cyan
+
+      - name: 🔄 MANTENER VIVO
+        shell: powershell
+        run: |
           while($true) { Start-Sleep -Seconds 60 }
           
