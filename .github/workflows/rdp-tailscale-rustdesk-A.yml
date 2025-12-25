@@ -1,4 +1,4 @@
-name: WINDOWS_10_VNC_LOCALTUNNEL
+name: WINDOWS_10_PURE_CLOUDFLARE
 on: 
   workflow_dispatch:
 
@@ -7,13 +7,11 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 📥 1. INSTALAR QEMU Y NODEJS
+      - name: 📥 1. INSTALAR QEMU Y CLOUDFLARE
         shell: powershell
         run: |
-          choco install qemu -y
-          # Instalamos Localtunnel usando NPM (viene con NodeJS en GitHub)
-          npm install -g localtunnel
-          Write-Host "[*] Descargando Windows 10..." -ForegroundColor Cyan
+          choco install qemu cloudflared -y
+          Write-Host "[*] Descargando Windows 10 Limpio..." -ForegroundColor Cyan
           curl.exe -L -o win10.iso "https://archive.org/download/tiny-10-NTDEV/tiny10%2023h1%20x64.iso"
 
       - name: 🚀 2. LANZAR VM
@@ -33,21 +31,29 @@ jobs:
             "-net user", `
             "-accel whpx"
 
-      - name: 🌐 3. ABRIR TUNEL PUBLICO
+      - name: 🌐 3. GENERAR IP PUBLICA
         shell: powershell
         run: |
-          Write-Host "[*] Iniciando Tunel..." -ForegroundColor Yellow
-          # Iniciamos localtunnel apuntando al puerto VNC (5900)
-          # Esto te dara una URL tipo: https://XXXXXX.loca.lt
-          Start-Process lt -ArgumentList "--port 5900" -RedirectStandardOutput "link.txt"
+          Write-Host "[*] Iniciando Tunel de Cloudflare..." -ForegroundColor Yellow
           
-          Start-Sleep -Seconds 15
-          $url = Get-Content "link.txt"
+          # Lanzamos el tunel y guardamos el log para extraer la URL
+          Start-Process cmd -ArgumentList "/c cloudflared tunnel --url tcp://localhost:5900 > cf.log 2>&1"
           
-          Write-Host "################################################" -ForegroundColor Green
-          Write-Host "TU URL PARA VNC ES: $url" -ForegroundColor Cyan
-          Write-Host "################################################" -ForegroundColor Green
-          Write-Host "Si la URL no carga en VNC Viewer, prueba poner la IP de GitHub directamente si la app lo permite."
+          Write-Host "[*] Esperando 20 segundos para obtener la direccion..." -ForegroundColor Cyan
+          Start-Sleep -Seconds 20
+          
+          # Buscamos la URL en el archivo de log
+          $cf_url = Get-Content "cf.log" | Select-String -Pattern "https://.*\.trycloudflare\.com" | ForEach-Object { $_.Matches.Value }
+          
+          if ($cf_url) {
+              Write-Host "################################################" -ForegroundColor Green
+              Write-Host "TU URL DE CONEXION ES: $cf_url" -ForegroundColor White
+              Write-Host "################################################" -ForegroundColor Green
+              Write-Host "Nota: Si usas VNC Viewer, usa el modo TCP con esa URL."
+          } else {
+              Write-Host "[-] No se detecto URL automatica. Mostrando logs para copia manual:" -ForegroundColor Orange
+              Get-Content "cf.log"
+          }
           
           while($true) { Start-Sleep -Seconds 60 }
           
