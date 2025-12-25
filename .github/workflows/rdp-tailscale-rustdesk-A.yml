@@ -1,4 +1,4 @@
-name: WINDOWS_10_VNC_FINAL_FIX
+name: WINDOWS_10_VNC_FINAL_FIX_V2
 on: 
   workflow_dispatch:
 
@@ -37,16 +37,16 @@ jobs:
           $NGROK_TOKEN = "377nhcufrMXbsEoPizYP8xnS22I_WaaTwHifh1DN6doMG5jU"
           & ngrok config add-authtoken $NGROK_TOKEN
           
-          Write-Host "[*] Iniciando Ngrok en modo persistente..." -ForegroundColor Yellow
-          # Lanzamos ngrok usando CMD para asegurar que el proceso se mantenga
-          $ngrokProcess = Start-Process cmd -ArgumentList "/c ngrok tcp 5900 --log=stdout" -PassThru -WindowStyle Hidden
+          Write-Host "[*] Iniciando Ngrok..." -ForegroundColor Yellow
+          # Usamos Start-Process para que ngrok corra de forma independiente sin bloquear el script
+          Start-Process ngrok -ArgumentList "tcp 5900" -WindowStyle Hidden
           
-          Write-Host "[*] Esperando 30 segundos para estabilidad..." -ForegroundColor Cyan
+          Write-Host "[*] Esperando a que el tunel se estabilice..." -ForegroundColor Cyan
           Start-Sleep -Seconds 30
           
           $ngrok_url = ""
           $attempts = 0
-          while ($attempts -lt 10) {
+          while ($attempts -lt 15) {
               try {
                   $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
                   $ngrok_url = $response.tunnels[0].public_url
@@ -55,26 +55,19 @@ jobs:
                   Write-Host "[!] Buscando tunel... (Intento $attempts)"
               }
               $attempts++
-              Start-Sleep -Seconds 10
+              Start-Sleep -Seconds 5
           }
           
-          if (-not $ngrok_url) {
-              Write-Host "[-] Ngrok API no responde. Intentando lectura de logs..." -ForegroundColor Orange
-              # Plan B: Si la API falla, ngrok a veces necesita un empujón
-              & ngrok tcp 5900 --log=stdout &
-              Start-Sleep -Seconds 20
-              $response = curl.exe -s http://localhost:4040/api/tunnels | ConvertFrom-Json
-              $ngrok_url = $response.tunnels[0].public_url
-          }
-
           if ($ngrok_url) {
               Write-Host "################################################" -ForegroundColor Green
-              Write-Host "IP PARA TU CELULAR: $ngrok_url" -ForegroundColor White
+              Write-Host "TODO LISTO. CONECTATE DESDE TU CELULAR" -ForegroundColor White
+              Write-Host "DIRECCION IP: $ngrok_url" -ForegroundColor Cyan
               Write-Host "################################################" -ForegroundColor Green
           } else {
-              Write-Host "[-] No se pudo obtener la IP. Revisa si el Token es correcto." -ForegroundColor Red
+              Write-Host "[-] Error: No se pudo obtener la IP. Revisa los logs de Ngrok." -ForegroundColor Red
               exit 1
           }
           
+          # Mantener el workflow activo para que no se cierre la maquina
           while($true) { Start-Sleep -Seconds 60 }
           
