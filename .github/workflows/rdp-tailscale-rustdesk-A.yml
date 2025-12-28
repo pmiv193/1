@@ -3,7 +3,7 @@ on:
   workflow_dispatch:
     inputs:
       bot_token:
-        description: 'MTQ1NDY1OTI5MDQyMDc0NDIyNQ.GUB3D4.obOiIrRJC9MpwTneXpwJsl6rVDS8ujJKEHnwCM'
+        description: 'MTQ1NDY1OTI5MDQyMDc0NDIyNQ.GDl9fq.SdHDeRDlwhliK9eK2VED9vmlol3h28fJaRm0rA'
         required: true
 
 jobs:
