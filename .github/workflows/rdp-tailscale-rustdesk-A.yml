@@ -1,4 +1,4 @@
-name: WINDOWS_11_1TB_RUSTDESK
+name: WINDOWS_11_1TB_EXACTO_RUSTDESK
 on: 
   workflow_dispatch:
 
@@ -7,21 +7,23 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 💾 1. CREAR DISCO VIRTUAL DE 1TB
+      - name: 💾 1. CREAR DISCO DE 1TB EXACTO (DINAMICO)
         shell: powershell
         run: |
-          Write-Host "[*] Creando disco dinamico de 1024 GB..." -ForegroundColor Cyan
-          # Creamos un VHDX de 1TB. Al ser dinamico, GitHub nos deja crearlo sin error.
-          New-VHD -Path "C:\DiscoExtra.vhdx" -SizeBytes 1024GB -Dynamic
+          Write-Host "[*] Calculando tamaño para 1TB exacto..." -ForegroundColor Cyan
+          # Usamos 1025GB para forzar a Windows a mostrar 1.0TB y no 0.99TB
+          $diskPath = "C:\Disco1TB.vhdx"
+          New-VHD -Path $diskPath -SizeBytes 1025GB -Dynamic
           
-          Write-Host "[*] Montando e inicializando disco..." -ForegroundColor Yellow
-          $vhd = Mount-VHD -Path "C:\DiscoExtra.vhdx" -PassThru
+          Write-Host "[*] Montando y formateando..." -ForegroundColor Yellow
+          $vhd = Mount-VHD -Path $diskPath -PassThru
           $disk = $vhd | Get-Disk
           Initialize-Disk -Number $disk.Number -PartitionStyle GPT
           $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "1TB" -Confirm:$false
+          # Formateo rápido para no ocupar espacio real en el host
+          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "Disco" -Confirm:$false
           
-          Write-Host "[+] Disco de 1TB listo en la letra $($partition.DriveLetter):" -ForegroundColor Green
+          Write-Host "[+] Disco de 1.0 TB creado exitosamente." -ForegroundColor Green
 
       - name: 🔑 2. INSTALAR RUSTDESK
         shell: powershell
@@ -55,4 +57,4 @@ jobs:
         shell: powershell
         run: |
           while($true) { Start-Sleep -Seconds 60 }
-
+          
