@@ -1,4 +1,4 @@
-name: WINDOWS_11_1TB_EXACTO_RUSTDESK
+name: WIN11_SPOOF_ESPANOL
 on: 
   workflow_dispatch:
 
@@ -7,25 +7,69 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 💾 1. CREAR DISCO DE 1TB EXACTO (DINAMICO)
+      - name: 🎭 1. SPOOFING DE HARDWARE (CPU & GPU)
         shell: powershell
         run: |
-          Write-Host "[*] Calculando tamaño para 1TB exacto..." -ForegroundColor Cyan
-          # Usamos 1025GB para forzar a Windows a mostrar 1.0TB y no 0.99TB
-          $diskPath = "C:\Disco1TB.vhdx"
-          New-VHD -Path $diskPath -SizeBytes 1025GB -Dynamic
+          Write-Host "[*] Iniciando operación de maquillaje..." -ForegroundColor Cyan
+
+          # --- 1. SPOOF CPU (Cambiar nombre de AMD EPYC a Ryzen 9) ---
+          $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
+          $cores = Get-ChildItem -Path $cpuPath
           
-          Write-Host "[*] Montando y formateando..." -ForegroundColor Yellow
-          $vhd = Mount-VHD -Path $diskPath -PassThru
+          foreach ($core in $cores) {
+              # Cambiamos el nombre en cada nucleo visible
+              Set-ItemProperty -Path $core.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 5950X 16-Core Processor"
+          }
+          Write-Host "[+] CPU camuflada como Ryzen 9 5950X." -ForegroundColor Green
+
+          # --- 2. SPOOF GPU (Cambiar nombre de Hyper-V Video a NVIDIA) ---
+          # Buscamos en el registro donde se guardan los nombres de los dispositivos PCI
+          $pciPath = "HKLM:\SYSTEM\CurrentControlSet\Enum\PCI"
+          
+          # Buscamos recursivamente cualquier dispositivo que se llame "Microsoft Hyper-V Video"
+          Get-ChildItem -Path $pciPath -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+              try {
+                  $friendlyName = $_ | Get-ItemProperty -Name "FriendlyName" -ErrorAction SilentlyContinue
+                  if ($friendlyName.FriendlyName -like "*Hyper-V Video*" -or $friendlyName.FriendlyName -like "*Microsoft Basic Display Adapter*") {
+                      # AQUI OCURRE LA MAGIA: Le cambiamos la etiqueta
+                      Set-ItemProperty -Path $_.PSPath -Name "FriendlyName" -Value "NVIDIA GeForce RTX 4090"
+                      Write-Host "[+] GPU ($($friendlyName.FriendlyName)) renombrada a RTX 4090." -ForegroundColor Green
+                  }
+              } catch {}
+          }
+          
+          # --- 3. SPOOF BIOS/SYSTEM INFO (Opcional, para que dxdiag se vea real) ---
+          Set-ItemProperty -Path "HKLM:\HARDWARE\DESCRIPTION\System\BIOS" -Name "SystemManufacturer" -Value "ASUS"
+          Set-ItemProperty -Path "HKLM:\HARDWARE\DESCRIPTION\System\BIOS" -Name "SystemProductName" -Value "ROG Crosshair VIII Dark Hero"
+
+      - name: 🇪🇸 2. INSTALAR ESPAÑOL (NATIVO)
+        shell: powershell
+        run: |
+          Write-Host "[*] Buscando paquete de idioma Español (España)..." -ForegroundColor Cyan
+          
+          # Este comando descarga e instala el idioma desde los servidores de Microsoft
+          # Es lo mismo que ir a Configuración > Hora e Idioma > Instalar
+          Install-Language es-ES
+          
+          Write-Host "[*] Configurando español como idioma principal..." -ForegroundColor Yellow
+          Set-WinSystemLocale es-ES
+          Set-WinUILanguageOverride es-ES
+          Set-WinUserLanguageList es-ES -Force
+          
+          Write-Host "[+] Idioma instalado. Se aplicará completamente al iniciar sesión." -ForegroundColor Green
+
+      - name: 💾 3. DISCO 1TB (VISUAL)
+        shell: powershell
+        run: |
+          # Creamos el disco visual de 1TB para completar el look
+          New-VHD -Path "C:\GamerDisk.vhdx" -SizeBytes 1024GB -Dynamic
+          $vhd = Mount-VHD -Path "C:\GamerDisk.vhdx" -PassThru
           $disk = $vhd | Get-Disk
           Initialize-Disk -Number $disk.Number -PartitionStyle GPT
           $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          # Formateo rápido para no ocupar espacio real en el host
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "Disco" -Confirm:$false
-          
-          Write-Host "[+] Disco de 1.0 TB creado exitosamente." -ForegroundColor Green
+          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "Juegos_1TB" -Confirm:$false
 
-      - name: 🔑 2. INSTALAR RUSTDESK
+      - name: 🔑 4. INSTALAR RUSTDESK
         shell: powershell
         run: |
           curl.exe -L -o rd.msi "https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.msi"
@@ -33,12 +77,19 @@ jobs:
           Start-Sleep -Seconds 15
           & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
-          $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
+          $id = ""
+          for ($i=0; $i -lt 12; $i++) {
+              $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
+              if ($id) { break }
+              Start-Sleep -Seconds 5
+          }
+          
           Write-Host "################################################" -ForegroundColor Yellow
-          Write-Host "ID: $id | CLAVE: Bullet123" -ForegroundColor Green
+          Write-Host "TU ID: $id" -ForegroundColor Green
+          Write-Host "CLAVE: Bullet123" -ForegroundColor Green
           Write-Host "################################################" -ForegroundColor Yellow
 
-      - name: 📸 3. CAPTURA A CATBOX
+      - name: 📸 5. CAPTURA A CATBOX
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms
@@ -49,9 +100,8 @@ jobs:
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
           $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
           $bitmap.Save("C:\Users\Public\id_screenshot.png")
-          
           $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\id_screenshot.png" https://catbox.moe/user/api.php
-          Write-Host "LINK CAPTURA: $link" -ForegroundColor Cyan
+          Write-Host "FOTO ID: $link" -ForegroundColor Cyan
 
       - name: 🔄 MANTENER VIVO
         shell: powershell
