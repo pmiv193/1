@@ -1,4 +1,4 @@
-name: WIN11_SPOOF_ESPANOL
+name: WIN11_NVIDIA_TRAY_GODMODE
 on: 
   workflow_dispatch:
 
@@ -7,67 +7,112 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: 🎭 1. SPOOFING DE HARDWARE (CPU & GPU)
+      - name: 🎭 1. HARDWARE SPOOFING (NIVEL KERNEL-LOOKALIKE)
         shell: powershell
         run: |
-          Write-Host "[*] Iniciando operación de maquillaje..." -ForegroundColor Cyan
+          Write-Host "[*] Iniciando Secuencia de Camuflaje Avanzado..." -ForegroundColor Cyan
 
-          # --- 1. SPOOF CPU (Cambiar nombre de AMD EPYC a Ryzen 9) ---
+          # --- A. CPU SPOOF (Ryzen 9 7950X3D) ---
           $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
-          $cores = Get-ChildItem -Path $cpuPath
-          
-          foreach ($core in $cores) {
-              # Cambiamos el nombre en cada nucleo visible
-              Set-ItemProperty -Path $core.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 5950X 16-Core Processor"
-          }
-          Write-Host "[+] CPU camuflada como Ryzen 9 5950X." -ForegroundColor Green
+          try {
+              $cores = Get-ChildItem -Path $cpuPath
+              foreach ($core in $cores) {
+                  # Cambiamos nombre y vendor para que parezca AMD legitimo
+                  Set-ItemProperty -Path $core.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 7950X3D 16-Core Processor" -ErrorAction SilentlyContinue
+                  Set-ItemProperty -Path $core.PSPath -Name "VendorIdentifier" -Value "AuthenticAMD" -ErrorAction SilentlyContinue
+              }
+              Write-Host "[+] CPU: Identidad suplantada con exito." -ForegroundColor Green
+          } catch { Write-Host "[-] Advertencia en CPU Spoof" -ForegroundColor Red }
 
-          # --- 2. SPOOF GPU (Cambiar nombre de Hyper-V Video a NVIDIA) ---
-          # Buscamos en el registro donde se guardan los nombres de los dispositivos PCI
-          $pciPath = "HKLM:\SYSTEM\CurrentControlSet\Enum\PCI"
+          # --- B. GPU SPOOF (Busqueda Profunda de Hyper-V) ---
+          Write-Host "[*] Inyectando identidad NVIDIA RTX 4090..." -ForegroundColor Yellow
+          $rootPaths = @("HKLM:\SYSTEM\CurrentControlSet\Enum\PCI", "HKLM:\SYSTEM\CurrentControlSet\Enum\ACPI")
           
-          # Buscamos recursivamente cualquier dispositivo que se llame "Microsoft Hyper-V Video"
-          Get-ChildItem -Path $pciPath -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
-              try {
-                  $friendlyName = $_ | Get-ItemProperty -Name "FriendlyName" -ErrorAction SilentlyContinue
-                  if ($friendlyName.FriendlyName -like "*Hyper-V Video*" -or $friendlyName.FriendlyName -like "*Microsoft Basic Display Adapter*") {
-                      # AQUI OCURRE LA MAGIA: Le cambiamos la etiqueta
-                      Set-ItemProperty -Path $_.PSPath -Name "FriendlyName" -Value "NVIDIA GeForce RTX 4090"
-                      Write-Host "[+] GPU ($($friendlyName.FriendlyName)) renombrada a RTX 4090." -ForegroundColor Green
-                  }
-              } catch {}
+          foreach ($root in $rootPaths) {
+              Get-ChildItem -Path $root -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+                  try {
+                      $prop = $_ | Get-ItemProperty -Name "FriendlyName" -ErrorAction SilentlyContinue
+                      if ($prop) {
+                          $name = $prop.FriendlyName
+                          # Detectamos cualquier driver de video generico
+                          if ($name -match "Hyper-V" -or $name -match "Microsoft" -or $name -match "Display Adapter") {
+                              Set-ItemProperty -Path $_.PSPath -Name "FriendlyName" -Value "NVIDIA GeForce RTX 4090" -Force
+                              Set-ItemProperty -Path $_.PSPath -Name "DeviceDesc" -Value "NVIDIA GeForce RTX 4090" -Force
+                              # Cambiamos el fabricante a NVIDIA
+                              Set-ItemProperty -Path $_.PSPath -Name "Mfg" -Value "NVIDIA" -Force
+                              Write-Host "[+] GPU en registro $($_.PSName) -> RTX 4090" -ForegroundColor Green
+                          }
+                      }
+                  } catch {}
+              }
           }
-          
-          # --- 3. SPOOF BIOS/SYSTEM INFO (Opcional, para que dxdiag se vea real) ---
-          Set-ItemProperty -Path "HKLM:\HARDWARE\DESCRIPTION\System\BIOS" -Name "SystemManufacturer" -Value "ASUS"
-          Set-ItemProperty -Path "HKLM:\HARDWARE\DESCRIPTION\System\BIOS" -Name "SystemProductName" -Value "ROG Crosshair VIII Dark Hero"
 
-      - name: 🇪🇸 2. INSTALAR ESPAÑOL (NATIVO)
+          # --- C. SYSTEM INFO (Motherboard ASUS) ---
+          $bios = "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
+          Set-ItemProperty -Path $bios -Name "SystemManufacturer" -Value "ASUS" -ErrorAction SilentlyContinue
+          Set-ItemProperty -Path $bios -Name "SystemProductName" -Value "ROG CROSSHAIR X670E HERO" -ErrorAction SilentlyContinue
+
+      - name: 🟢 2. INYECTAR SYSTEM TRAY ICON (NVIDIA)
         shell: powershell
         run: |
-          Write-Host "[*] Buscando paquete de idioma Español (España)..." -ForegroundColor Cyan
+          Write-Host "[*] Compilando script de System Tray..." -ForegroundColor Cyan
           
-          # Este comando descarga e instala el idioma desde los servidores de Microsoft
-          # Es lo mismo que ir a Configuración > Hora e Idioma > Instalar
-          Install-Language es-ES
+          # 1. Descargar el icono oficial de NVIDIA (.ico)
+          $iconPath = "C:\Users\Public\nvidia.ico"
+          Invoke-WebRequest -Uri "https://raw.githubusercontent.com/fajardos87/icons/main/nvidia.ico" -OutFile $iconPath -ErrorAction SilentlyContinue
           
-          Write-Host "[*] Configurando español como idioma principal..." -ForegroundColor Yellow
-          Set-WinSystemLocale es-ES
-          Set-WinUILanguageOverride es-ES
-          Set-WinUserLanguageList es-ES -Force
-          
-          Write-Host "[+] Idioma instalado. Se aplicará completamente al iniciar sesión." -ForegroundColor Green
+          # Si falla la descarga, usamos un icono generico del sistema para que no falle el script
+          if (-not (Test-Path $iconPath)) {
+              Write-Host "[!] Usando icono de sistema por fallo de descarga." -ForegroundColor Yellow
+              $iconPath = "C:\Windows\System32\shell32.dll" # Fallback
+          }
 
-      - name: 💾 3. DISCO 1TB (VISUAL)
+          # 2. Crear el script "Fantasma" que mantendra el icono vivo
+          $trayScript = @"
+          Add-Type -AssemblyName System.Windows.Forms
+          Add-Type -AssemblyName System.Drawing
+          
+          \$notify = New-Object System.Windows.Forms.NotifyIcon
+          try {
+              \$notify.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("$iconPath")
+          } catch {
+              \$notify.Icon = [System.Drawing.Icon]::ExtractAssociatedIcon("C:\Windows\regedit.exe")
+          }
+          
+          \$notify.Text = "NVIDIA Settings - RTX 4090"
+          \$notify.Visible = \$True
+          
+          # Crear menu contextual (Click derecho)
+          \$menu = New-Object System.Windows.Forms.ContextMenu
+          \$item1 = \$menu.MenuItems.Add("NVIDIA Control Panel")
+          \$item1.add_Click({ Start-Process "dxdiag.exe" })
+          \$item2 = \$menu.MenuItems.Add("GeForce Experience")
+          \$item3 = \$menu.MenuItems.Add("-")
+          \$item4 = \$menu.MenuItems.Add("Exit")
+          \$item4.add_Click({ \$notify.Visible = \$False; [System.Windows.Forms.Application]::Exit() })
+          
+          \$notify.ContextMenu = \$menu
+          
+          # Bucle infinito de UI para mantener el icono
+          \$ctx = New-Object System.Windows.Forms.ApplicationContext
+          [System.Windows.Forms.Application]::Run(\$ctx)
+          "@
+          
+          $trayScript | Out-File -Encoding UTF8 "C:\Users\Public\FakeNvidiaTray.ps1"
+          
+          # 3. Lanzar el proceso en segundo plano (Hidden)
+          Write-Host "[*] Lanzando proceso NVIDIA Container (Fake)..." -ForegroundColor Green
+          Start-Process powershell -ArgumentList "-NoProfile -ExecutionPolicy Bypass -File C:\Users\Public\FakeNvidiaTray.ps1" -WindowStyle Hidden
+
+      - name: 💾 3. DISCO 1TB (DINAMICO EXACTO)
         shell: powershell
         run: |
-          # Creamos el disco visual de 1TB para completar el look
-          New-VHD -Path "C:\GamerDisk.vhdx" -SizeBytes 1024GB -Dynamic
-          $vhd = Mount-VHD -Path "C:\GamerDisk.vhdx" -PassThru
+          New-VHD -Path "C:\GamingStorage.vhdx" -SizeBytes 1025GB -Dynamic
+          $vhd = Mount-VHD -Path "C:\GamingStorage.vhdx" -PassThru
           $disk = $vhd | Get-Disk
           Initialize-Disk -Number $disk.Number -PartitionStyle GPT
           $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "Juegos_1TB" -Confirm:$false
+          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "Disco" -Confirm:$false
 
       - name: 🔑 4. INSTALAR RUSTDESK
         shell: powershell
@@ -78,18 +123,17 @@ jobs:
           & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
           $id = ""
-          for ($i=0; $i -lt 12; $i++) {
+          for ($i=0; $i -lt 15; $i++) {
               $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
               if ($id) { break }
               Start-Sleep -Seconds 5
           }
-          
           Write-Host "################################################" -ForegroundColor Yellow
-          Write-Host "TU ID: $id" -ForegroundColor Green
+          Write-Host "ID RUSTDESK: $id" -ForegroundColor Green
           Write-Host "CLAVE: Bullet123" -ForegroundColor Green
           Write-Host "################################################" -ForegroundColor Yellow
 
-      - name: 📸 5. CAPTURA A CATBOX
+      - name: 📸 5. CAPTURA DE PRUEBA A CATBOX
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms
@@ -99,9 +143,10 @@ jobs:
           $bitmap = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
           $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\Users\Public\id_screenshot.png")
-          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\id_screenshot.png" https://catbox.moe/user/api.php
-          Write-Host "FOTO ID: $link" -ForegroundColor Cyan
+          $bitmap.Save("C:\Users\Public\proof.png")
+          
+          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\proof.png" https://catbox.moe/user/api.php
+          Write-Host "CAPTURA DISPONIBLE: $link" -ForegroundColor Cyan
 
       - name: 🔄 MANTENER VIVO
         shell: powershell
