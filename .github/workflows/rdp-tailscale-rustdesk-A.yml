@@ -1,4 +1,4 @@
-name: WIN11_TITAN_V2_REALISM
+name: WIN11_RTX4090_REALISM_V3
 on: 
   workflow_dispatch:
 
@@ -7,10 +7,10 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: ☢️ 1. INGENIERÍA INVERSA DE REGISTRO (MODO EXPERTO)
+      - name: ☢️ 1. MODIFICACIÓN DE KERNEL (NIVEL EXPERTO)
         shell: powershell
         run: |
-          Write-Host "[*] INICIANDO REESCRITURA DE KERNEL (VISUAL)..." -ForegroundColor Cyan
+          Write-Host "[*] INICIANDO PROTOCOLO DE SIMULACIÓN DE HARDWARE..." -ForegroundColor Cyan
 
           # --- A. CPU (Ryzen 9 7950X3D) ---
           $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
@@ -18,102 +18,112 @@ jobs:
               Get-ChildItem -Path $cpuPath -ErrorAction SilentlyContinue | ForEach-Object {
                   Set-ItemProperty -Path $_.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 7950X3D 16-Core Processor" -Force
                   Set-ItemProperty -Path $_.PSPath -Name "VendorIdentifier" -Value "AuthenticAMD" -Force
+                  Set-ItemProperty -Path $_.PSPath -Name "FeatureSet" -Value 0 -Force
               }
-              Write-Host "[+] CPU: Identidad AMD forzada." -ForegroundColor Green
+              Write-Host "[OK] CPU: Identidad AMD establecida." -ForegroundColor Green
           } catch {}
 
-          # --- B. GPU (SPOOFING TOTAL DE CLASE DE VIDEO) ---
-          # Atacamos la clave {4d36e968...} que controla los adaptadores de pantalla
+          # --- B. GPU (SPOOFING AGRESIVO DE CLASE Y SERVICIO) ---
           $videoClass = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
           
           try {
               Get-ChildItem -Path $videoClass -ErrorAction SilentlyContinue | ForEach-Object {
-                  # Buscamos cualquier driver activo (Hyper-V o Microsoft Basic)
+                  # Detectamos si es el driver activo de Microsoft/Hyper-V
                   $desc = ($_ | Get-ItemProperty -Name "DriverDesc" -ErrorAction SilentlyContinue).DriverDesc
-                  if ($desc -like "*Microsoft*" -or $desc -like "*Hyper-V*" -or $desc -like "*Display*") {
+                  if ($desc -match "Microsoft" -or $desc -match "Hyper-V" -or $desc -match "Display") {
                       
-                      Write-Host "[*] Objetivo localizado: $desc. Inyectando Drivers Falsos..." -ForegroundColor Yellow
+                      Write-Host "[*] Objetivo encontrado: $desc. Inyectando Payload NVIDIA..." -ForegroundColor Yellow
 
-                      # 1. NOMBRE PRINCIPAL (Lo que sale arriba en DxDiag)
+                      # 1. EL NOMBRE PRINCIPAL (LA SOLUCIÓN A TU PROBLEMA)
+                      # DxDiag prefiere 'DriverDesc' si 'ProviderName' no es Microsoft.
                       Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
+                      Set-ItemProperty -Path $_.PSPath -Name "DriverVersion" -Value "31.0.15.3713" -Force
+                      Set-ItemProperty -Path $_.PSPath -Name "DriverDate" -Value "2-24-2025" -Force
                       
-                      # 2. DETALLES DEL CHIP (Lo que sale en el cuadro de abajo)
+                      # 2. SIMULACIÓN DE ID DE HARDWARE (REAL RTX 4090 ID)
+                      # Esto engaña a las herramientas para que crean que el ID PCI es de NVIDIA
+                      Set-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -Value "PCI\VEN_10DE&DEV_2684" -Force
+                      
+                      # 3. DETALLES DEL CHIP
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.AdapterString" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.ChipType" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.DacType" -Value "Integrated RAMDAC" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.BiosString" -Value "Version 95.02.18.00.01" -Force
-                      
-                      # 3. VRAM (MEMORIA DE VIDEO) - EL TRUCO DE LOS 24GB
-                      # Inyectamos 24GB en Bytes: 25769803776. 
-                      # Windows lee esto como "Dedicated Video Memory" si la clave es correcta.
-                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
+
+                      # 4. VRAM MAESTRA (24GB)
+                      # Usamos QWORD (64-bit) para que 'Display Memory' no salga en 0 MB
+                      # 24GB = 25769803776 bytes
                       New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
-                      
-                      # 4. LIMPIEZA DE RASTROS
-                      # Borramos referencias a Microsoft si existen para obligar a leer las nuestras
-                      Remove-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -ErrorAction SilentlyContinue
+                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
                   }
               }
-              Write-Host "[+] GPU: RTX 4090 con 24GB VRAM simulada." -ForegroundColor Green
-          } catch { Write-Host "[!] Error accediendo a Video Class." -ForegroundColor Red }
+              Write-Host "[OK] GPU: RTX 4090 Inyectada con exito." -ForegroundColor Green
+          } catch { Write-Host "[!] Error en GPU Spoof" -ForegroundColor Red }
 
-          # --- C. SYSTEM MODEL (ELIMINAR "VIRTUAL MACHINE") ---
-          # Esta es la clave que te faltaba. DxDiag lee de aquí primero.
-          $sysInfo = "HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation"
-          try {
-              New-Item -Path $sysInfo -Force -ErrorAction SilentlyContinue | Out-Null
-              Set-ItemProperty -Path $sysInfo -Name "SystemManufacturer" -Value "ASUS" -Force
-              Set-ItemProperty -Path $sysInfo -Name "SystemProductName" -Value "ROG STRIX X670E-F GAMING WIFI" -Force
-              Set-ItemProperty -Path $sysInfo -Name "BIOSVersion" -Value "1807" -Force
-              Set-ItemProperty -Path $sysInfo -Name "BIOSReleaseDate" -Value "12/15/2025" -Force
-              Write-Host "[+] SYSTEM INFO: Identidad ASUS ROG establecida." -ForegroundColor Green
-          } catch {}
-          
-          # Refuerzo en HARDWARE/DESCRIPTION (Backup)
-          $bios = "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
-          Set-ItemProperty -Path $bios -Name "SystemManufacturer" -Value "ASUS" -ErrorAction SilentlyContinue
-          Set-ItemProperty -Path $bios -Name "SystemProductName" -Value "ROG STRIX X670E-F GAMING WIFI" -ErrorAction SilentlyContinue
+          # --- C. SYSTEM INFO (ELIMINAR 'VIRTUAL MACHINE') ---
+          # Atacamos SystemInformation en ControlSet para borrar el rastro de VM
+          $sysInfoPaths = @(
+            "HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation",
+            "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
+          )
 
-      - name: 🇪🇸 2. LOCALIZACIÓN ESPAÑA (SIN INSTALACIÓN PESADA)
+          foreach ($path in $sysInfoPaths) {
+              try {
+                  if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
+                  Set-ItemProperty -Path $path -Name "SystemManufacturer" -Value "ASUS" -Force -ErrorAction SilentlyContinue
+                  Set-ItemProperty -Path $path -Name "SystemProductName" -Value "ROG CROSSHAIR X670E HERO" -Force -ErrorAction SilentlyContinue
+                  Set-ItemProperty -Path $path -Name "BaseBoardManufacturer" -Value "ASUSTeK COMPUTER INC." -Force -ErrorAction SilentlyContinue
+                  Set-ItemProperty -Path $path -Name "BIOSVendor" -Value "American Megatrends Inc." -Force -ErrorAction SilentlyContinue
+                  Set-ItemProperty -Path $path -Name "BIOSReleaseDate" -Value "09/22/2025" -Force -ErrorAction SilentlyContinue
+              } catch {}
+          }
+          Write-Host "[OK] BIOS: Identidad ASUS ROG establecida." -ForegroundColor Green
+
+      - name: 🇪🇸 2. CONFIGURACIÓN ESPAÑOLA (OPTIMIZADA)
         shell: powershell
         run: |
-          # Cambiamos formatos, moneda y hora. No instalamos el pack completo para no congelar.
+          # Cambiamos la cultura y la zona horaria.
+          # NO instalamos el paquete de idioma completo porque tarda 15 min y congela el runner.
+          # Esto pondrá fechas, monedas y formatos en Español de España.
           Set-Culture es-ES
+          Set-WinSystemLocale es-ES
           Set-TimeZone -Id "Romance Standard Time"
           Set-WinHomeLocation -GeoId 217
-          Write-Host "[OK] Sistema configurado en Español (España) - Formatos"
+          Write-Host "[OK] Locale configurado a es-ES (España)."
 
-      - name: 💾 3. DISCO NVMe 1TB
+      - name: 💾 3. DISCO GAMING 1TB
         shell: powershell
         run: |
-          New-VHD -Path "C:\Games.vhdx" -SizeBytes 1025GB -Dynamic
-          $vhd = Mount-VHD -Path "C:\Games.vhdx" -PassThru
+          New-VHD -Path "C:\Games_Storage.vhdx" -SizeBytes 1025GB -Dynamic
+          $vhd = Mount-VHD -Path "C:\Games_Storage.vhdx" -PassThru
           $disk = $vhd | Get-Disk
           Initialize-Disk -Number $disk.Number -PartitionStyle GPT
           $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "NVMe_Gen5_SSD" -Confirm:$false
+          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "NVMe_Gen5_1TB" -Confirm:$false
 
-      - name: 🔑 4. RUSTDESK (ACCESO)
+      - name: 🔑 4. INSTALAR RUSTDESK
         shell: powershell
         run: |
+          Write-Host "[*] Descargando RustDesk..."
           curl.exe -L -o rd.msi "https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.msi"
           Start-Process msiexec.exe -ArgumentList "/i rd.msi /quiet /norestart" -Wait
+          
           Start-Sleep -Seconds 10
           & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
           
           $id = ""
-          for ($i=0; $i -lt 15; $i++) {
+          for ($i=0; $i -lt 20; $i++) {
               $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
               if ($id) { break }
-              Start-Sleep -Seconds 5
+              Start-Sleep -Seconds 3
           }
-          Write-Host "################################################" -ForegroundColor Yellow
-          Write-Host "ID: $id" -ForegroundColor Green
-          Write-Host "PASS: Bullet123" -ForegroundColor Green
-          Write-Host "################################################" -ForegroundColor Yellow
+          Write-Host "================================================" -ForegroundColor Yellow
+          Write-Host " ID DE CONEXION: $id" -ForegroundColor Green
+          Write-Host " CONTRASEÑA:     Bullet123" -ForegroundColor Green
+          Write-Host "================================================" -ForegroundColor Yellow
 
-      - name: 📸 5. EVIDENCIA FINAL
+      - name: 📸 5. EVIDENCIA DE SEGURIDAD
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms
@@ -122,11 +132,12 @@ jobs:
           $bitmap = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
           $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\Users\Public\final_check.png")
-          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\final_check.png" https://catbox.moe/user/api.php
-          Write-Host "FOTO: $link" -ForegroundColor Cyan
+          $bitmap.Save("C:\Users\Public\proof.png")
+          
+          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\proof.png" https://catbox.moe/user/api.php
+          Write-Host "CAPTURA EXITOSA: $link" -ForegroundColor Cyan
 
-      - name: 🔄 ANTICONGELAMIENTO
+      - name: 🔄 BUCLE INFINITO
         shell: powershell
         run: |
           while($true) { Start-Sleep -Seconds 60 }
