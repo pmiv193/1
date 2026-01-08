@@ -34,7 +34,7 @@ jobs:
                       
                       Write-Host "[*] Objetivo encontrado: $desc. Inyectando Payload NVIDIA..." -ForegroundColor Yellow
 
-                      # 1. EL NOMBRE PRINCIPAL (LA SOLUCIÓN A TU PROBLEMA)
+                      # 1. EL NOMBRE PRINCIPAL (LA SOLUCION A TU PROBLEMA)
                       # DxDiag prefiere 'DriverDesc' si 'ProviderName' no es Microsoft.
                       Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
