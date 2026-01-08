@@ -41,7 +41,7 @@ jobs:
                       Set-ItemProperty -Path $_.PSPath -Name "DriverVersion" -Value "31.0.15.3713" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "DriverDate" -Value "2-24-2025" -Force
                       
-                      # 2. SIMULACIÓN DE ID DE HARDWARE (REAL RTX 4090 ID)
+                      # 2. SIMULACION DE ID DE HARDWARE (REAL RTX 4090 ID)
                       # Esto engaña a las herramientas para que crean que el ID PCI es de NVIDIA
                       Set-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -Value "PCI\VEN_10DE&DEV_2684" -Force
                       
