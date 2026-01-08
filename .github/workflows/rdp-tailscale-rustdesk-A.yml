@@ -1,4 +1,4 @@
-name: WIN11_SECTOR_7G_FINAL
+name: WIN11_TITAN_V4_FINAL
 on: 
   workflow_dispatch:
 
@@ -7,12 +7,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: ☢️ 1. INGENIERIA DE NUCLEO (HARDWARE SPOOF)
+      - name: ☢️ 1. HARDWARE SPOOFING (ASCII ONLY)
         shell: powershell
         run: |
-          Write-Host "[*] INICIANDO SECUENCIA DE ENMASCARAMIENTO..." -ForegroundColor Cyan
+          Write-Host "[*] INICIANDO PROTOCOLO TITAN V4..." -ForegroundColor Cyan
 
-          # --- A. PROTOCOLO CPU (Ryzen 9 7950X3D) ---
+          # --- A. CPU (Ryzen 9 7950X3D) ---
           $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
           try {
               Get-ChildItem -Path $cpuPath -ErrorAction SilentlyContinue | ForEach-Object {
@@ -23,51 +23,46 @@ jobs:
               Write-Host "[OK] CPU: Identidad AMD establecida." -ForegroundColor Green
           } catch {}
 
-          # --- B. PROTOCOLO GPU (RTX 4090 + 24GB VRAM) ---
-          # Objetivo: HKLM\SYSTEM\CurrentControlSet\Control\Class\{4d36e968...}
+          # --- B. GPU (RTX 4090 + 24GB VRAM FIX) ---
+          # Ruta critica donde Windows guarda los adaptadores de video
           $videoClass = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
           
           try {
               Get-ChildItem -Path $videoClass -ErrorAction SilentlyContinue | ForEach-Object {
-                  # Escaneamos buscando drivers de Microsoft/Hyper-V
+                  # Leemos la descripcion actual para encontrar el driver de Microsoft
                   $desc = ($_ | Get-ItemProperty -Name "DriverDesc" -ErrorAction SilentlyContinue).DriverDesc
                   if ($desc -match "Microsoft" -or $desc -match "Hyper-V" -or $desc -match "Display") {
                       
-                      Write-Host "[*] Objetivo detectado ($desc). Inyectando Payload NVIDIA..." -ForegroundColor Yellow
+                      Write-Host "[*] Objetivo encontrado: $desc" -ForegroundColor Yellow
 
-                      # 1. FUERZA BRUTA AL NOMBRE (DEVICE DESCRIPTION)
-                      # Esto cambia lo que sale en la linea "Name" de DxDiag
+                      # 1. NOMBRE DEL DISPOSITIVO (Name Override)
+                      # MatchingDeviceId es la clave. 10DE = NVIDIA, 2684 = RTX 4090
                       Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "DriverVersion" -Value "31.0.15.3713" -Force
-                      
-                      # 2. ENGAÑO DE ID DE HARDWARE (PCI ID REAL)
-                      # El ID 10DE es NVIDIA, 2684 es la RTX 4090
                       Set-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -Value "PCI\VEN_10DE&DEV_2684" -Force
                       
-                      # 3. DETALLES DEL CHIP (Lo que sale abajo)
+                      # 2. DETALLES DEL CHIP (Chip Type)
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.AdapterString" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.ChipType" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.DacType" -Value "Integrated RAMDAC" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.BiosString" -Value "Version 95.02.18.00.01" -Force
 
-                      # 4. VRAM 24GB (QWORD HEX) - ESTO ARREGLA LOS 0 MB
-                      # Usamos -PropertyType QWord para enteros de 64 bits
-                      # 25769803776 bytes = 24GB exactos
-                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
-                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
+                      # 3. SOLUCION VRAM 0 MB (QWORD FIX)
+                      # Borramos valores viejos para evitar conflictos de tipo
+                      Remove-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -ErrorAction SilentlyContinue
+                      Remove-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -ErrorAction SilentlyContinue
                       
-                      # 5. LIMPIEZA DE RASTROS
-                      # Borramos la referencia al servicio Hyper-V si es posible para romper el vinculo
-                      # (Es arriesgado pero necesario para el cambio de nombre)
-                      # Set-ItemProperty -Path $_.PSPath -Name "Service" -Value "nvlddmkm" -Force -ErrorAction SilentlyContinue
+                      # Inyectamos 24GB como entero de 64 bits (QWord)
+                      # 25769803776 bytes = 24GB
+                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 25769803776 -PropertyType QWord -Force
+                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force
                   }
               }
-              Write-Host "[OK] GPU: RTX 4090 Inyectada correctamente." -ForegroundColor Green
-          } catch { Write-Host "[!] Error critico en GPU Spoof" -ForegroundColor Red }
+              Write-Host "[OK] GPU: RTX 4090 Inyectada (ID + VRAM Fix)." -ForegroundColor Green
+          } catch { Write-Host "[!] Error en GPU Spoof" -ForegroundColor Red }
 
-          # --- C. PROTOCOLO SISTEMA (ASUS ROG) ---
-          # Esto elimina el texto 'Virtual Machine'
+          # --- C. SYSTEM INFO (ASUS ROG) ---
           $sysInfoPaths = @(
             "HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation",
             "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
@@ -82,18 +77,18 @@ jobs:
                   Set-ItemProperty -Path $path -Name "BIOSVendor" -Value "American Megatrends Inc." -Force -ErrorAction SilentlyContinue
               } catch {}
           }
-          Write-Host "[OK] BIOS: Identidad ASUS ROG confirmada." -ForegroundColor Green
+          Write-Host "[OK] BIOS: Identidad ASUS establecida." -ForegroundColor Green
 
-      - name: 🇪🇸 2. REGION ESPANA (RAPIDO)
+      - name: 🇪🇸 2. REGION (RAPIDO)
         shell: powershell
         run: |
           Set-Culture es-ES
           Set-WinSystemLocale es-ES
           Set-TimeZone -Id "Romance Standard Time"
           Set-WinHomeLocation -GeoId 217
-          Write-Host "[OK] Locale configurado a es-ES."
+          Write-Host "[OK] Region cambiada."
 
-      - name: 💾 3. DISCO 1TB NVMe
+      - name: 💾 3. DISCO GAMING 1TB
         shell: powershell
         run: |
           New-VHD -Path "C:\Games_Storage.vhdx" -SizeBytes 1025GB -Dynamic
@@ -101,9 +96,9 @@ jobs:
           $disk = $vhd | Get-Disk
           Initialize-Disk -Number $disk.Number -PartitionStyle GPT
           $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "NVMe_Gen5_SSD" -Confirm:$false
+          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "NVMe_Gen5_1TB" -Confirm:$false
 
-      - name: 🔑 4. ACCESO REMOTO (RUSTDESK)
+      - name: 🔑 4. ACCESO REMOTO
         shell: powershell
         run: |
           Write-Host "[*] Descargando RustDesk..."
@@ -120,8 +115,8 @@ jobs:
               Start-Sleep -Seconds 3
           }
           Write-Host "================================================" -ForegroundColor Yellow
-          Write-Host " ID DE CONEXION: $id" -ForegroundColor Green
-          Write-Host " PASS:           Bullet123" -ForegroundColor Green
+          Write-Host " ID:   $id" -ForegroundColor Green
+          Write-Host " PASS: Bullet123" -ForegroundColor Green
           Write-Host "================================================" -ForegroundColor Yellow
 
       - name: 📸 5. EVIDENCIA
@@ -136,9 +131,9 @@ jobs:
           $bitmap.Save("C:\Users\Public\proof.png")
           
           $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\proof.png" https://catbox.moe/user/api.php
-          Write-Host "CAPTURA EXITOSA: $link" -ForegroundColor Cyan
+          Write-Host "FOTO: $link" -ForegroundColor Cyan
 
-      - name: 🔄 MANTENER VIVO (LOOP)
+      - name: 🔄 LOOP INFINITO
         shell: powershell
         run: |
           while($true) { Start-Sleep -Seconds 60 }
