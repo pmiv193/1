@@ -7,7 +7,7 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: ☢️ 1. MODIFICACIÓN DE KERNEL (NIVEL EXPERTO)
+      - name: ☢️ 1. MODIFICACION DE KERNEL (NIVEL EXPERTO)
         shell: powershell
         run: |
           Write-Host "[*] INICIANDO PROTOCOLO DE SIMULACIÓN DE HARDWARE..." -ForegroundColor Cyan
@@ -80,7 +80,7 @@ jobs:
           }
           Write-Host "[OK] BIOS: Identidad ASUS ROG establecida." -ForegroundColor Green
 
-      - name: 🇪🇸 2. CONFIGURACIÓN ESPAÑOLA (OPTIMIZADA)
+      - name: 🇪🇸 2. CONFIGURACION ESPANOLA (OPTIMIZADA)
         shell: powershell
         run: |
           # Cambiamos la cultura y la zona horaria.
