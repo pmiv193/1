@@ -1,4 +1,4 @@
-name: WIN11_RTX4090_REALISM_V3
+name: WIN11_TITAN_FINAL_FIX
 on: 
   workflow_dispatch:
 
@@ -7,12 +7,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: ☢️ 1. MODIFICACION DE KERNEL (NIVEL EXPERTO)
+      - name: ☢️ 1. MODIFICACION KERNEL (ASCII SAFE)
         shell: powershell
         run: |
-          Write-Host "[*] INICIANDO PROTOCOLO DE SIMULACIÓN DE HARDWARE..." -ForegroundColor Cyan
+          Write-Host "[*] INICIANDO PROTOCOLO DE SIMULACION DE HARDWARE..." -ForegroundColor Cyan
 
-          # --- A. CPU (Ryzen 9 7950X3D) ---
+          # --- A. CPU SPOOF (Ryzen 9 7950X3D) ---
           $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
           try {
               Get-ChildItem -Path $cpuPath -ErrorAction SilentlyContinue | ForEach-Object {
@@ -23,46 +23,40 @@ jobs:
               Write-Host "[OK] CPU: Identidad AMD establecida." -ForegroundColor Green
           } catch {}
 
-          # --- B. GPU (SPOOFING AGRESIVO DE CLASE Y SERVICIO) ---
+          # --- B. GPU SPOOF (RTX 4090 + 24GB VRAM) ---
           $videoClass = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
           
           try {
               Get-ChildItem -Path $videoClass -ErrorAction SilentlyContinue | ForEach-Object {
-                  # Detectamos si es el driver activo de Microsoft/Hyper-V
+                  # Buscamos drivers de Microsoft o Hyper-V
                   $desc = ($_ | Get-ItemProperty -Name "DriverDesc" -ErrorAction SilentlyContinue).DriverDesc
                   if ($desc -match "Microsoft" -or $desc -match "Hyper-V" -or $desc -match "Display") {
                       
-                      Write-Host "[*] Objetivo encontrado: $desc. Inyectando Payload NVIDIA..." -ForegroundColor Yellow
+                      Write-Host "[*] Objetivo encontrado. Inyectando Payload NVIDIA..." -ForegroundColor Yellow
 
-                      # 1. EL NOMBRE PRINCIPAL (LA SOLUCION A TU PROBLEMA)
-                      # DxDiag prefiere 'DriverDesc' si 'ProviderName' no es Microsoft.
+                      # 1. NOMBRE DEL DRIVER (EL FIX PRINCIPAL)
+                      # MatchingDeviceId fuerza a DxDiag a usar nuestros nombres
                       Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "DriverVersion" -Value "31.0.15.3713" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "DriverDate" -Value "2-24-2025" -Force
-                      
-                      # 2. SIMULACION DE ID DE HARDWARE (REAL RTX 4090 ID)
-                      # Esto engaña a las herramientas para que crean que el ID PCI es de NVIDIA
                       Set-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -Value "PCI\VEN_10DE&DEV_2684" -Force
                       
-                      # 3. DETALLES DEL CHIP
+                      # 2. INFO DEL CHIP
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.AdapterString" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.ChipType" -Value "NVIDIA GeForce RTX 4090" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.DacType" -Value "Integrated RAMDAC" -Force
                       Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.BiosString" -Value "Version 95.02.18.00.01" -Force
 
-                      # 4. VRAM MAESTRA (24GB)
-                      # Usamos QWORD (64-bit) para que 'Display Memory' no salga en 0 MB
-                      # 24GB = 25769803776 bytes
+                      # 3. VRAM 24GB (QWORD HEX)
+                      # 25769803776 bytes = 24GB
                       New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
                       New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force -ErrorAction SilentlyContinue
                   }
               }
-              Write-Host "[OK] GPU: RTX 4090 Inyectada con exito." -ForegroundColor Green
+              Write-Host "[OK] GPU: RTX 4090 Inyectada." -ForegroundColor Green
           } catch { Write-Host "[!] Error en GPU Spoof" -ForegroundColor Red }
 
-          # --- C. SYSTEM INFO (ELIMINAR 'VIRTUAL MACHINE') ---
-          # Atacamos SystemInformation en ControlSet para borrar el rastro de VM
+          # --- C. SYSTEM INFO (BYPASS VIRTUAL MACHINE) ---
           $sysInfoPaths = @(
             "HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation",
             "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
@@ -75,24 +69,20 @@ jobs:
                   Set-ItemProperty -Path $path -Name "SystemProductName" -Value "ROG CROSSHAIR X670E HERO" -Force -ErrorAction SilentlyContinue
                   Set-ItemProperty -Path $path -Name "BaseBoardManufacturer" -Value "ASUSTeK COMPUTER INC." -Force -ErrorAction SilentlyContinue
                   Set-ItemProperty -Path $path -Name "BIOSVendor" -Value "American Megatrends Inc." -Force -ErrorAction SilentlyContinue
-                  Set-ItemProperty -Path $path -Name "BIOSReleaseDate" -Value "09/22/2025" -Force -ErrorAction SilentlyContinue
               } catch {}
           }
           Write-Host "[OK] BIOS: Identidad ASUS ROG establecida." -ForegroundColor Green
 
-      - name: 🇪🇸 2. CONFIGURACION ESPANOLA (OPTIMIZADA)
+      - name: 🇪🇸 2. REGION ESPANA
         shell: powershell
         run: |
-          # Cambiamos la cultura y la zona horaria.
-          # NO instalamos el paquete de idioma completo porque tarda 15 min y congela el runner.
-          # Esto pondrá fechas, monedas y formatos en Español de España.
           Set-Culture es-ES
           Set-WinSystemLocale es-ES
           Set-TimeZone -Id "Romance Standard Time"
           Set-WinHomeLocation -GeoId 217
-          Write-Host "[OK] Locale configurado a es-ES (España)."
+          Write-Host "[OK] Locale configurado a es-ES."
 
-      - name: 💾 3. DISCO GAMING 1TB
+      - name: 💾 3. DISCO 1TB
         shell: powershell
         run: |
           New-VHD -Path "C:\Games_Storage.vhdx" -SizeBytes 1025GB -Dynamic
@@ -120,10 +110,10 @@ jobs:
           }
           Write-Host "================================================" -ForegroundColor Yellow
           Write-Host " ID DE CONEXION: $id" -ForegroundColor Green
-          Write-Host " CONTRASEÑA:     Bullet123" -ForegroundColor Green
+          Write-Host " PASS:           Bullet123" -ForegroundColor Green
           Write-Host "================================================" -ForegroundColor Yellow
 
-      - name: 📸 5. EVIDENCIA DE SEGURIDAD
+      - name: 📸 5. EVIDENCIA
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms
@@ -137,7 +127,7 @@ jobs:
           $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\proof.png" https://catbox.moe/user/api.php
           Write-Host "CAPTURA EXITOSA: $link" -ForegroundColor Cyan
 
-      - name: 🔄 BUCLE INFINITO
+      - name: 🔄 MANTENER VIVO
         shell: powershell
         run: |
           while($true) { Start-Sleep -Seconds 60 }
