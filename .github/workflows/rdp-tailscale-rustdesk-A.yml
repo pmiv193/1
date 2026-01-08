@@ -1,140 +1,76 @@
-name: WIN11_TITAN_V4_FINAL
+name: WIN11_RTX5090_WINDOWS_APP
 on: 
   workflow_dispatch:
+    inputs:
+      tailscale_key:
+        description: 'Tu Tailscale Auth Key'
+        required: true
 
 jobs:
   deploy:
     runs-on: windows-latest
     timeout-minutes: 360
     steps:
-      - name: ☢️ 1. HARDWARE SPOOFING (ASCII ONLY)
+      - name: 🚀 1. SPOOFING RTX 5090 (PROVIDER NVIDIA)
         shell: powershell
         run: |
-          Write-Host "[*] INICIANDO PROTOCOLO TITAN V4..." -ForegroundColor Cyan
-
-          # --- A. CPU (Ryzen 9 7950X3D) ---
-          $cpuPath = "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor"
-          try {
-              Get-ChildItem -Path $cpuPath -ErrorAction SilentlyContinue | ForEach-Object {
-                  Set-ItemProperty -Path $_.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 7950X3D 16-Core Processor" -Force
-                  Set-ItemProperty -Path $_.PSPath -Name "VendorIdentifier" -Value "AuthenticAMD" -Force
-                  Set-ItemProperty -Path $_.PSPath -Name "FeatureSet" -Value 0 -Force
-              }
-              Write-Host "[OK] CPU: Identidad AMD establecida." -ForegroundColor Green
-          } catch {}
-
-          # --- B. GPU (RTX 4090 + 24GB VRAM FIX) ---
-          # Ruta critica donde Windows guarda los adaptadores de video
+          Write-Host "[*] INYECTANDO HARDWARE RTX 5090..." -ForegroundColor Cyan
           $videoClass = "HKLM:\SYSTEM\CurrentControlSet\Control\Class\{4d36e968-e325-11ce-bfc1-08002be10318}"
-          
-          try {
-              Get-ChildItem -Path $videoClass -ErrorAction SilentlyContinue | ForEach-Object {
-                  # Leemos la descripcion actual para encontrar el driver de Microsoft
-                  $desc = ($_ | Get-ItemProperty -Name "DriverDesc" -ErrorAction SilentlyContinue).DriverDesc
-                  if ($desc -match "Microsoft" -or $desc -match "Hyper-V" -or $desc -match "Display") {
-                      
-                      Write-Host "[*] Objetivo encontrado: $desc" -ForegroundColor Yellow
-
-                      # 1. NOMBRE DEL DISPOSITIVO (Name Override)
-                      # MatchingDeviceId es la clave. 10DE = NVIDIA, 2684 = RTX 4090
-                      Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 4090" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "DriverVersion" -Value "31.0.15.3713" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "MatchingDeviceId" -Value "PCI\VEN_10DE&DEV_2684" -Force
-                      
-                      # 2. DETALLES DEL CHIP (Chip Type)
-                      Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.AdapterString" -Value "NVIDIA GeForce RTX 4090" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.ChipType" -Value "NVIDIA GeForce RTX 4090" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.DacType" -Value "Integrated RAMDAC" -Force
-                      Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.BiosString" -Value "Version 95.02.18.00.01" -Force
-
-                      # 3. SOLUCION VRAM 0 MB (QWORD FIX)
-                      # Borramos valores viejos para evitar conflictos de tipo
-                      Remove-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -ErrorAction SilentlyContinue
-                      Remove-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -ErrorAction SilentlyContinue
-                      
-                      # Inyectamos 24GB como entero de 64 bits (QWord)
-                      # 25769803776 bytes = 24GB
-                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 25769803776 -PropertyType QWord -Force
-                      New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.MemorySize" -Value 25769803776 -PropertyType QWord -Force
-                  }
+          Get-ChildItem -Path $videoClass -ErrorAction SilentlyContinue | ForEach-Object {
+              $desc = ($_ | Get-ItemProperty -Name "DriverDesc" -ErrorAction SilentlyContinue).DriverDesc
+              if ($desc -match "Microsoft" -or $desc -match "Hyper-V" -or $desc -match "Display") {
+                  # Nombre y Proveedor
+                  Set-ItemProperty -Path $_.PSPath -Name "DriverDesc" -Value "NVIDIA GeForce RTX 5090" -Force
+                  Set-ItemProperty -Path $_.PSPath -Name "ProviderName" -Value "NVIDIA" -Force
+                  Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.ChipType" -Value "NVIDIA GeForce RTX 5090" -Force
+                  Set-ItemProperty -Path $_.PSPath -Name "HardwareInformation.AdapterString" -Value "NVIDIA GeForce RTX 5090" -Force
+                  
+                  # 32GB VRAM (QWORD)
+                  New-ItemProperty -Path $_.PSPath -Name "HardwareInformation.QwMemorySize" -Value 34359738368 -PropertyType QWord -Force
               }
-              Write-Host "[OK] GPU: RTX 4090 Inyectada (ID + VRAM Fix)." -ForegroundColor Green
-          } catch { Write-Host "[!] Error en GPU Spoof" -ForegroundColor Red }
-
-          # --- C. SYSTEM INFO (ASUS ROG) ---
-          $sysInfoPaths = @(
-            "HKLM:\SYSTEM\CurrentControlSet\Control\SystemInformation",
-            "HKLM:\HARDWARE\DESCRIPTION\System\BIOS"
-          )
-
-          foreach ($path in $sysInfoPaths) {
-              try {
-                  if (!(Test-Path $path)) { New-Item -Path $path -Force | Out-Null }
-                  Set-ItemProperty -Path $path -Name "SystemManufacturer" -Value "ASUS" -Force -ErrorAction SilentlyContinue
-                  Set-ItemProperty -Path $path -Name "SystemProductName" -Value "ROG CROSSHAIR X670E HERO" -Force -ErrorAction SilentlyContinue
-                  Set-ItemProperty -Path $path -Name "BaseBoardManufacturer" -Value "ASUSTeK COMPUTER INC." -Force -ErrorAction SilentlyContinue
-                  Set-ItemProperty -Path $path -Name "BIOSVendor" -Value "American Megatrends Inc." -Force -ErrorAction SilentlyContinue
-              } catch {}
           }
-          Write-Host "[OK] BIOS: Identidad ASUS establecida." -ForegroundColor Green
-
-      - name: 🇪🇸 2. REGION (RAPIDO)
-        shell: powershell
-        run: |
-          Set-Culture es-ES
-          Set-WinSystemLocale es-ES
-          Set-TimeZone -Id "Romance Standard Time"
-          Set-WinHomeLocation -GeoId 217
-          Write-Host "[OK] Region cambiada."
-
-      - name: 💾 3. DISCO GAMING 1TB
-        shell: powershell
-        run: |
-          New-VHD -Path "C:\Games_Storage.vhdx" -SizeBytes 1025GB -Dynamic
-          $vhd = Mount-VHD -Path "C:\Games_Storage.vhdx" -PassThru
-          $disk = $vhd | Get-Disk
-          Initialize-Disk -Number $disk.Number -PartitionStyle GPT
-          $partition = New-Partition -DiskNumber $disk.Number -UseMaximumSize -AssignDriveLetter
-          Format-Volume -DriveLetter $partition.DriveLetter -FileSystem NTFS -NewFileSystemLabel "NVMe_Gen5_1TB" -Confirm:$false
-
-      - name: 🔑 4. ACCESO REMOTO
-        shell: powershell
-        run: |
-          Write-Host "[*] Descargando RustDesk..."
-          curl.exe -L -o rd.msi "https://github.com/rustdesk/rustdesk/releases/download/1.3.1/rustdesk-1.3.1-x86_64.msi"
-          Start-Process msiexec.exe -ArgumentList "/i rd.msi /quiet /norestart" -Wait
-          
-          Start-Sleep -Seconds 10
-          & "C:\Program Files\RustDesk\rustdesk.exe" --password Bullet123
-          
-          $id = ""
-          for ($i=0; $i -lt 20; $i++) {
-              $id = & "C:\Program Files\RustDesk\rustdesk.exe" --get-id
-              if ($id) { break }
-              Start-Sleep -Seconds 3
+          # CPU Spoof
+          Get-ChildItem -Path "HKLM:\HARDWARE\DESCRIPTION\System\CentralProcessor" | ForEach-Object {
+              Set-ItemProperty -Path $_.PSPath -Name "ProcessorNameString" -Value "AMD Ryzen 9 7950X3D 16-Core Processor" -Force
           }
-          Write-Host "================================================" -ForegroundColor Yellow
-          Write-Host " ID:   $id" -ForegroundColor Green
-          Write-Host " PASS: Bullet123" -ForegroundColor Green
-          Write-Host "================================================" -ForegroundColor Yellow
 
-      - name: 📸 5. EVIDENCIA
+      - name: 🌐 2. CONEXION TAILSCALE
+        shell: powershell
+        run: |
+          curl.exe -L -o tailscale-setup.exe https://pkgs.tailscale.com/stable/tailscale-setup-latest.exe
+          Start-Process .\tailscale-setup.exe -ArgumentList "/quiet" -Wait
+          & "C:\Program Files\Tailscale\tailscale.exe" up --authkey ${{ github.event.inputs.tailscale_key }}
+          $tsIp = (& "C:\Program Files\Tailscale\tailscale.exe" ip -4)
+          Write-Host "====================================" -ForegroundColor Yellow
+          Write-Host "IP DE TAILSCALE: $tsIp" -ForegroundColor Green
+          Write-Host "====================================" -ForegroundColor Yellow
+
+      - name: 🔑 3. CONFIGURAR RDP (PARA WINDOWS APP)
+        shell: powershell
+        run: |
+          # Habilitar Escritorio Remoto
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server' -Name "fDenyTSConnections" -Value 0
+          Enable-NetFirewallRule -DisplayGroup "Remote Desktop"
+          Set-ItemProperty -Path 'HKLM:\System\CurrentControlSet\Control\Terminal Server\WinStations\RDP-Tcp' -Name "UserAuthentication" -Value 1
+          
+          # Establecer contraseña para el usuario actual (runneradmin)
+          $Password = ConvertTo-SecureString "Bullet123!" -AsPlainText -Force
+          Set-LocalUser -Name "runneradmin" -Password $Password
+          Write-Host "[OK] RDP listo. User: runneradmin | Pass: Bullet123!" -ForegroundColor Green
+
+      - name: 📸 4. EVIDENCIA CATBOX
         shell: powershell
         run: |
           Add-Type -AssemblyName System.Windows.Forms
-          Start-Sleep -Seconds 2
-          $screen = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-          $bitmap = New-Object System.Drawing.Bitmap($screen.Width, $screen.Height)
+          $bitmap = New-Object System.Drawing.Bitmap([System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Width, [System.Windows.Forms.Screen]::PrimaryScreen.Bounds.Height)
           $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-          $graphics.CopyFromScreen($screen.Left, $screen.Top, 0, 0, $bitmap.Size)
-          $bitmap.Save("C:\Users\Public\proof.png")
-          
-          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\proof.png" https://catbox.moe/user/api.php
-          Write-Host "FOTO: $link" -ForegroundColor Cyan
+          $graphics.CopyFromScreen(0, 0, 0, 0, $bitmap.Size)
+          $bitmap.Save("C:\Users\Public\check.png")
+          $link = curl.exe -F "reqtype=fileupload" -F "fileToUpload=@C:\Users\Public\check.png" https://catbox.moe/user/api.php
+          Write-Host "SCREENSHOT: $link" -ForegroundColor Cyan
 
       - name: 🔄 LOOP INFINITO
         shell: powershell
         run: |
           while($true) { Start-Sleep -Seconds 60 }
-          
+
